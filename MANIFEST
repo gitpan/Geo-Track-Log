@@ -1,14 +1,12 @@
 Changes
 eg/garnix_log.txt
 eg/test.gpx
-lib/Geo/Track/.#Log.pm.1.3
+eg/way_merge.pl
 lib/Geo/Track/Log.pm
 Makefile.PL
-MANIFEST
-META.yml			Module meta-data (added by MakeMaker)
+MANIFEST			This list of files
 README
 t/01_basic.t
 t/02_gpx.t
-t/1.t
-t/2.t
-t/x
+t/03_garnix_way.t
+META.yml                                 Module meta-data (added by MakeMaker)

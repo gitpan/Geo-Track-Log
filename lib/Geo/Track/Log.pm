@@ -6,9 +6,11 @@ use XML::Simple;
 use Carp;
 use vars '*interpolate';
 use strict;
-use warnings;
+use Data::Compare;
+use Data::Dumper;
+#use warnings;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 ###########################################################################
 sub new {
@@ -67,16 +69,45 @@ sub loadTrackFromGarnix {
 	$self->addPoint($pt);
     }
 }
+sub output_track_text{
+    my $self = shift;
+    print "lat\t";
+    print "long\t";
+    my $pt = $self->{log}->[0];
+    foreach my $k (sort keys %$pt) {
+            next if ($k =~ /lat/i);
+            next if ($k =~ /long/i);
+            print $k . "\t";
+    }
+    print "\n";
 
+    foreach my $pt (@{$self->{log}}) {
+        print $pt->{lat} . "\t";
+        print $pt->{long} . "\t";
+        foreach my $k (sort keys %$pt) {
+            next if ($k =~ /lat/i);
+            next if ($k =~ /long/i);
+            print $pt->{$k} . "\t";
+        }
+        print "\n";
+    }
+}
+
+
+
+
+# this has a problem!!!  fixGarnixWayLine has the problem that 
+# waypoint names used to be space delimited, but waypoints from 
+# the rino have names that _can_ be in quotes and include spaces.
 sub loadWayFromGarnix {
     my ($self, $FH) = @_;
     while (my $st = <$FH>) { 
-	chomp $st;
-	next unless $st =~ /^\s*-?\d/o;
-	$st =~ s/^\s+//gos;
+        chomp $st;
+        next unless $st =~ /^\s*-?\d/o;
+        $st =~ s/^\s+//gos;
 
-	my $pt = $self->fixGarnixWayLine($st);
-	$self->addPoint($pt);
+        my $pt = $self->fixGarnixWayLine($st);
+        $self->addPoint($pt);
     }
 }
 
@@ -115,26 +146,50 @@ sub fixGarnixTrackLine {
 
 	return $pt
 }
+
+
+
 sub fixGarnixWayLine {
 	my ($self, $st) = @_;
     $st =~ s/^\s+//g;
 	
 	my ($pt, @lat, @long, $date, $time, $name, $comment);
+    my @rest;
 
 	# this is a garnix line
-    # track line
-	#44?  3' 33.23" -123?  5'  0.07" 148.0 WGS84 00:50:19-2004/07/12 [1];
 
     # way line
     #38? 18' 11.5" -123?  3' 27.8" 0.0 WGS84   ADV2 "CRTD 14:37 15-OCT-00";
-	# the ? is 'really' a degree symbol
 
-	# this splits that line based on spaces.
-	(@lat[0..2], @long[0..2], $pt->{elevation}, $pt->{datum}, 
-		$pt->{name}, $pt->{comment}) = split /\s+/, $st;
+    # but this is also a wayline: note the space in the waypoint name
+    # 'FELIX CAFE'.
+    #33� 47' 14.77" -117� 51' 12.67" 55.0 WGS84 "FELIX CAFE" "" [knife N];
+   
+    # I think I am safe through the datum, then it becomes space delimited
+    # with optional quotes that mean disregard the space.
+
+    # this splits that line based on spaces.
+    (@lat[0..2], @long[0..2], $pt->{elevation}, $pt->{datum},
+        @rest) = split /\s+/, $st;
+    my $rest = join ' ', @rest;
+
+    # name and comment parsing
+
+    # is the name in comments?
+    if ( $rest =~ s/^"([^"]+)"//) {
+        $pt->{name} = $1;
+    } else {
+        $rest =~ s/^([\S]+)\s//;
+        $pt->{name} = $1;
+    }
+
+    # comment includes the waypoint symbol, but I can't deal
+    # with that at this point...
+    $pt->{comment} = $rest;
+
 	$pt->{lat}  = dms_to_deg(@lat);
 	$pt->{long} = dms_to_deg(@long);
-	next unless $pt->{lat} and $pt->{long};
+	return undef  unless $pt->{lat} and $pt->{long};
 
 	#($pt->{time}, $pt->{date}) = split /-/, $pt->{timestamp};
 	#$pt->{date} =~ s|/|-|g;
@@ -295,6 +350,97 @@ sub getPercent {
 	return $pct;
 }
 
+
+# accept a ref to an array Geo::Track::Log objects and 
+# then return the distinct union of all of them.
+#
+# note: This method seems to work fine, but it doesn't have tests (ack!)
+# it isn't documented, and it has development comments within...
+sub combine_waypoint{
+	my ($self, $log_list) = @_;
+
+
+    # this doesn't really work yet.  In fact, fixGarnixWayLine seems to 
+    # not really work in all cases.
+
+    # hash of hashes key = name, value = a hashref representing a point
+    my %list;
+
+    # this only works for 'waypoints' which for this are defined
+    # as Geo::Track::Log objects that contain a name field.
+
+    # I don't have a way to address points by name or identifier.
+    foreach my $log (@$log_list) {
+        #print "$log->{name}\n";
+        foreach my $pt (@{$log->{log}}){
+            # I want something like this, but I can't 
+            # have it because I can't address points by name
+            # or identifier, and so this requires a complete
+            # walk of the list of points for every point added.
+            #$self->addPointNonDupe($pt);
+
+            # add this point to list unless it is a dupe
+            
+            # just add the point and see what happens...
+            # this logic means don't add duplicate names, but 
+            # that means we lose points if we have name collisions.
+            # my 'home' today and my home 'tomorrow' have the same
+            # name, but are different points.
+
+            my $add = 0;
+            # if I used some hash of values in the hash this would
+            # be trivial...
+            if (! $list{$pt->{name}}){
+                # we don't have this point in our list at all
+                $add = 1;
+                #$list{$pt->{name}} = $pt;
+            } else {
+                # we have one point in the list with this name, but
+                # perhaps this point has different information.  Say
+                # the same name but a different lat,long, or a different
+                # date or comment.
+                
+                # need to compare this pt with each point already
+                # in the array pointed to by $list{name}
+              
+                # add = 0.  Do we want to add this?
+                # only if it Compare() == 0 for all points. 
+                my $flag; 
+                foreach my $oldpt (@{$list{$pt->{name}}}){
+                    # is it different ?
+                    $flag += Compare( $oldpt, $pt);
+                    # what about distance?
+                    # if the names are the same, the CRTD field
+                    # is the same, and the lat and long are the 
+                    # same to 4 decimal places then let it be.
+                    if ($pt->{CRTD} eq $oldpt->{CRTD}) {
+                        # do something with distance?
+
+                        # assume it is a dupe
+                        my $dupe = 1;
+                        # this needs code to determine if it is a dupe!
+                        
+                    }
+                } 
+                 
+                $add = ! $flag;
+            }
+             
+            if ($add) {
+                push @{$list{$pt->{name}}}, $pt;
+            }
+        }
+    }
+    foreach my $k (sort keys %list) {
+        foreach my $pt (@{$list{$k}}) {
+            $self->addPoint($pt);
+        }
+    }
+    
+}
+
+
+
 1;
 
 
@@ -329,10 +475,16 @@ Geo::Track::Log - Represent track logs and find a location based on a track log 
   (see DESCRIPTION for more)
 
   Load tracklog from a Garnix format file
-  $log->loadTrackFromGarnix('filename');
+  $log->loadTrackFromGarnix('file handle');
+
+  Load Waypoint from a Garnix format file
+  $log->loadWayFromGarnix('file handle');
 
   Fix the funky Garnix line format
   my $pt = $log->fixGarnixTrackLine ( qq( 44?  3' 33.23" -123?  5'  0.07" 148.0 WGS84 00:50:19-2004/07/12 [1];) )
+
+  Load a GPX (GPS XML) format file
+  $log->loadTrackFromGPX('file handle');
 
   return the earliest point, by time
   my $pt = $log->minTimeStamp();
@@ -466,9 +618,11 @@ Geo::Track::Log - Represent track logs and find a location based on a track log 
 
   Rich Gibson, E<lt>rgibson@cpan.orgmE<gt>
 
+  Schuyler Erle E<lt>schuyler@nocat.netE<gt> GPX support and general help
+
+
   Thanks to: 
   Gene Boggs E<lt>gene@cpan.orgE<gt>
-  Schuyler Erle E<lt>schuyler@nocat.netE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
@@ -478,3 +632,4 @@ This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 
 
 =cut
+

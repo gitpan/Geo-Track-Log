@@ -1,14 +1,12 @@
-use 5.005001;
+use 5.008001;
 use ExtUtils::MakeMaker;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 WriteMakefile(
-    NAME              => 'Geo::Track::Log',
+    NAME              => 'Geo-Track-Log',
     VERSION_FROM      => 'lib/Geo/Track/Log.pm', # finds $VERSION
-    PREREQ_PM         => {
-	'Time::Piece' => 1.08,
-	'XML::Simple' => 2.12,
-    }, 
-   ABSTRACT_FROM  => 'lib/Geo/Track/Log.pm', # retrieve abstract from module
-   AUTHOR         => 'Rich Gibson <rgibson@cpan.org>',
+    PREREQ_PM         => {}, # e.g., Module::Name => 1.1
+    ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
+      (ABSTRACT_FROM  => 'lib/Geo/Track/Log.pm', # retrieve abstract from module
+       AUTHOR         => 'Rich Gibson <rgibson@cpan.org>') : ()),
 );
