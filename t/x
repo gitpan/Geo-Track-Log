@@ -1,0 +1,9 @@
+# test wayfiles
+$st = qq( 38? 24'  9.1" -122? 49' 43.8" 0.0 WGS84   HOME "CRTD 15:45 30-JUL-00";);
+$pt = $trk->fixGarnixWayLine($st);
+is(sprintf("%.5f",  $pt->{lat}),   38.05904, "fixGarnixWayLine Check latitude");
+is(sprintf("%.4f", $pt->{long}), 123.0833, "fixGarnixWayLine Check longitude");
+is(sprintf("%.4f", $pt->{name}), 'HOME', "fixGarnixWayLine Check name");
+exit;
+
+

@@ -1,0 +1,14 @@
+Changes
+eg/garnix_log.txt
+eg/test.gpx
+lib/Geo/Track/.#Log.pm.1.3
+lib/Geo/Track/Log.pm
+Makefile.PL
+MANIFEST
+META.yml			Module meta-data (added by MakeMaker)
+README
+t/01_basic.t
+t/02_gpx.t
+t/1.t
+t/2.t
+t/x
